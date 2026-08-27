@@ -263,24 +263,23 @@ updateRefrost() {
 }
 
   // 입김 도구: 닦아낸 영역에 다시 뽀얀 서리 복원하기
-  steamRefrost(x, y) {
-    const radius = 45;
-    const fCtx = this.frostCtx;
+  // 입김 도구: 닦아낸 자국(fadePills)을 배열에서 제거하여 서리를 즉시 복원
+steamRefrost(x, y) {
+  const radius = 45; // 입김 범위
 
-    fCtx.save();
-    fCtx.globalCompositeOperation = 'source-over';
+  if (this.fadePills.length === 0) return;
 
-    const grad = fCtx.createRadialGradient(x, y, 0, x, y, radius);
-    grad.addColorStop(0, 'rgba(175, 198, 215, 0.25)');
-    grad.addColorStop(0.8, 'rgba(175, 198, 215, 0.1)');
-    grad.addColorStop(1, 'rgba(175, 198, 215, 0)');
+  // 입김 범위 안에 들어오는 닦인 자국들을 제거
+  for (let i = this.fadePills.length - 1; i >= 0; i--) {
+    const pill = this.fadePills[i];
+    const dist = Math.hypot(pill.x - x, pill.y - y);
 
-    fCtx.fillStyle = grad;
-    fCtx.beginPath();
-    fCtx.arc(x, y, radius, 0, Math.PI * 2);
-    fCtx.fill();
-    fCtx.restore();
+    // 입김이 스친 영역의 자국을 즉시 소멸시켜 뿌옇게 만듦
+    if (dist <= radius + pill.radius) {
+      this.fadePills.splice(i, 1);
+    }
   }
+}
 
   updateAndDrawStaticDrops() {
     const len = this.staticDrops.length;
