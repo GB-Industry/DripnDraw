@@ -1,7 +1,10 @@
 class RainWindow {
   constructor(canvasId) {
     this.canvas = document.getElementById(canvasId);
-    this.ctx = this.canvas.getContext('2d');
+    this.ctx = this.canvas.getContext('2d',{
+      willReadFrequently: false, // getImageData를 자주 쓰지 않는다면 false
+      alpha: true
+    });
 
     // 서리 및 지우기 레이어 처리를 위한 메모리 전용(Offscreen) 캔버스
     this.frostCanvas = document.createElement('canvas');
@@ -217,10 +220,16 @@ class RainWindow {
     };
 
     const addPill = (px, py) => {
-      // 시간 기록 없이 좌표와 반지름만 저장
-      this.clearedPills.push({ x: px, y: py, radius });
-      triggerFadeInRadius(px, py);
-    };
+  // 그려진 시점의 타임스탬프(now) 저장
+  this.clearedPills.push({ x: px, y: py, radius, time: now });
+
+  // 💡 배열이 600개를 넘어가면 가장 오래된 자국을 지워 연산량 유지
+  if (this.clearedPills.length > 600) {
+    this.clearedPills.shift();
+  }
+
+  triggerFadeInRadius(px, py);
+};
 
     if (isMove) {
       const dist = Math.hypot(x - this.lastX, y - this.lastY);
@@ -478,11 +487,8 @@ class RainWindow {
   const dropdownMenu = document.getElementById('dropdown-menu');
   const isMenuOpen = dropdownMenu && !dropdownMenu.classList.contains('hidden');
 
-  // 1. 메뉴가 열려있을 때는 캔버스 드로잉 차단
-  if (isMenuOpen) return;
-
-  // 2. 햄버거 버튼 자체를 클릭했을 때 드로잉 차단
-  if (e.target.closest('.hamburger-btn')) return;
+  // 메뉴가 열려있거나 햄버거 버튼 자체를 눌렀을 때는 드로잉 차단
+  if (isMenuOpen || e.target.closest('.hamburger-btn')) return;
 
   this.isDrawing = true;
   const { x, y } = this.getCoordinates(e);
