@@ -1,0 +1,17 @@
+# 시스템 및 OS 임시 파일
+.DS_Store
+Thumbs.db
+
+# IDE / 에디터 설정 파일 (VS Code)
+.vscode/
+.idea/
+
+# 혹시 나중에 추가될 수 있는 민감한 환경 변수 파일
+.env
+.env.local
+*.env
+
+# 의존성 패키지 및 빌드 관련 (혹시 사용 시)
+node_modules/
+dist/
+build/
