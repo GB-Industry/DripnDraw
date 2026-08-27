@@ -30,6 +30,7 @@ body, html {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  pointer-events: none; /* 💡 추가: 컨테이너 여백 영역의 이벤트 투과 */
 }
 
 /* 햄버거 버튼 (글래스모피즘) */
@@ -49,6 +50,7 @@ body, html {
   gap: 5px;
   transition: background 0.3s, transform 0.2s;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+  pointer-events: auto; /* 💡 추가: 버튼 자체는 클릭 가능 */
 }
 
 .hamburger-btn:hover {
@@ -95,12 +97,14 @@ body, html {
   transform: translateY(0) scale(1);
   transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1),
               transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto; /* 💡 추가: 열려있을 땐 메뉴 조작 가능 */
 }
 
 .dropdown-menu.hidden {
   opacity: 0;
   transform: translateY(-12px) scale(0.95);
   pointer-events: none;
+  display: none;
 }
 
 /* 도구 선택버튼 영역 */
