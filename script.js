@@ -1,12 +1,10 @@
 class RainWindow {
   constructor(canvasId) {
-    this.canvas = document.getElementById(canvasId);
-    this.ctx = this.canvas.getContext('2d',{
-      willReadFrequently: false, // getImageData를 자주 쓰지 않는다면 false
-      alpha: true
-    });
+    this.canvas = document.getElementById('frost-canvas');
+    this.ctx = this.canvas.getContext('2d', { alpha: false });
+    this.fadePills = []; // 다시 서리가 차오를 영역 관리
 
-    // 서리 및 지우기 레이어 처리를 위한 메모리 전용(Offscreen) 캔버스
+    // 서리 레이어 전용 오프스크린 캔버스
     this.frostCanvas = document.createElement('canvas');
     this.frostCtx = this.frostCanvas.getContext('2d');
 
@@ -17,14 +15,10 @@ class RainWindow {
     this.currentTool = 'finger';
     this.brushRadius = 28;
 
-    this.clearedPills = [];
-    this.frostDelayMs = 8000;
-    this.fadeDurationMs = 3500;
-
     this.staticDrops = [];
     this.movingDrops = [];
 
-    // 카페 야경 고화질 이미지
+    // 배경 이미지 로드
     this.bgImage = new Image();
     this.bgImage.crossOrigin = 'Anonymous';
     this.bgImage.src = './background2.png';
@@ -41,91 +35,106 @@ class RainWindow {
     this.resizeCanvas();
     this.bindEvents();
     this.bindUIEvents();
-    this.generateDrops();
     this.startAnimationLoop();
   }
 
   resizeCanvas() {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5); // 고해상도 과부하 방지
 
-    this.canvas.width = w;
-    this.canvas.height = h;
+    this.canvas.width = w * dpr;
+    this.canvas.height = h * dpr;
+    this.frostCanvas.width = w * dpr;
+    this.frostCanvas.height = h * dpr;
 
-    this.frostCanvas.width = w;
-    this.frostCanvas.height = h;
+    this.ctx.scale(dpr, dpr);
+    this.frostCtx.scale(dpr, dpr);
 
+    // 캔버스 크기 변경 시 서리 기본 바탕 생성
+    this.resetFrostLayer();
     this.generateDrops();
+  }
+  
+
+  // 기본 서리 바탕 1회 채우기
+  resetFrostLayer() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const fCtx = this.frostCtx;
+
+    fCtx.save();
+    fCtx.clearRect(0, 0, w, h);
+    fCtx.fillStyle = 'rgba(175, 198, 215, 0.78)';
+    fCtx.fillRect(0, 0, w, h);
+    fCtx.restore();
   }
 
   generateDrops() {
     this.staticDrops = [];
     this.movingDrops = [];
 
-    const cellSize = 16;
-    const cols = Math.ceil(this.canvas.width / cellSize);
-    const rows = Math.ceil(this.canvas.height / cellSize);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    // 정적 물방울 개수 최적화 (격자 크기 확대)
+    const cellSize = 28;
+    const cols = Math.ceil(w / cellSize);
+    const rows = Math.ceil(h / cellSize);
 
     for (let c = 0; c < cols; c++) {
       for (let r = 0; r < rows; r++) {
+        if (Math.random() > 0.6) continue; // 물방울 밀도 조절로 렌더링 경량화
+
         const x = (c + Math.random()) * cellSize;
         const y = (r + Math.random()) * cellSize;
-
-        const rand = Math.random();
-        let radius, maxAlpha;
-
-        if (rand < 0.65) {
-          radius = Math.random() * 1.0 + 0.6;
-          maxAlpha = Math.random() * 0.35 + 0.25;
-        } else if (rand < 0.92) {
-          radius = Math.random() * 2.0 + 1.4;
-          maxAlpha = Math.random() * 0.45 + 0.35;
-        } else {
-          radius = Math.random() * 3.0 + 2.5;
-          maxAlpha = Math.random() * 0.5 + 0.4;
-        }
+        const radius = Math.random() * 1.8 + 0.8;
 
         this.staticDrops.push({
-          x, y, r: radius, alpha: maxAlpha,
-          rx: radius * (Math.random() * 0.35 + 0.85),
-          ry: radius * (Math.random() * 0.35 + 0.85),
+          x, y, r: radius,
+          alpha: Math.random() * 0.4 + 0.3,
+          rx: radius * (Math.random() * 0.3 + 0.85),
+          ry: radius * (Math.random() * 0.3 + 0.85),
           isFading: false
         });
       }
     }
 
-    for (let i = 0; i < 28; i++) {
+    // 흘러내리는 물방울 수 축소 (28개 -> 12개)
+    for (let i = 0; i < 12; i++) {
       this.movingDrops.push(this.createMovingDrop());
     }
   }
 
   createMovingDrop() {
     return {
-      x: Math.random() * this.canvas.width,
-      y: Math.random() * this.canvas.height - this.canvas.height,
-      r: Math.random() * 3.2 + 3.2,
-      speed: Math.random() * 2.5 + 1.4,
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight - window.innerHeight,
+      r: Math.random() * 2.5 + 2.5,
+      speed: Math.random() * 2.0 + 1.2,
       trail: [],
       isWaiting: false,
       waitTimer: 0,
-      maxWait: Math.random() * 50 + 10
+      maxWait: Math.random() * 40 + 10
     };
   }
 
   startAnimationLoop() {
-    const render = (timestamp) => {
-      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    const render = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
 
-      // 1. 선명한 배경 이미지 그리기 (항상 맨 밑바탕에 유지)
+      this.ctx.clearRect(0, 0, w, h);
+      // 서리 자동 복원 처리
+      this.updateRefrost();
+
+      // 1. 배경 연산
       this.drawNightBackground();
 
-      // 2. 오프스크린 캔버스에 서리 레이어를 만들고 손자국 뚫기
-      this.renderFrostOffscreen(timestamp);
+      // 2. 오프스크린 캔버스에 기록되어 있는 서리 레이어 합성
+      this.ctx.drawImage(this.frostCanvas, 0, 0, w, h);
 
-      // 3. 서리 레이어를 메인 캔버스 위에 합성
-      this.ctx.drawImage(this.frostCanvas, 0, 0);
-
-      // 4. 최상단 물방울 렌더링
+      // 3. 최상단 물방울만 매 프레임 업데이트
       this.updateAndDrawStaticDrops();
       this.updateAndDrawMovingDrops();
 
@@ -135,134 +144,142 @@ class RainWindow {
     requestAnimationFrame(render);
   }
 
-  // 선명한 창밖 카페 야경 배경
   drawNightBackground() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
     if (this.bgLoaded) {
-      const scale = Math.max(this.canvas.width / this.bgImage.width, this.canvas.height / this.bgImage.height);
-      const x = (this.canvas.width / 2) - (this.bgImage.width / 2) * scale;
-      const y = (this.canvas.height / 2) - (this.bgImage.height / 2) * scale;
+      const scale = Math.max(w / this.bgImage.width, h / this.bgImage.height);
+      const x = (w / 2) - (this.bgImage.width / 2) * scale;
+      const y = (h / 2) - (this.bgImage.height / 2) * scale;
 
       this.ctx.drawImage(this.bgImage, x, y, this.bgImage.width * scale, this.bgImage.height * scale);
     } else {
-      const grad = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-      grad.addColorStop(0, '#0a1118');
-      grad.addColorStop(0.5, '#121e2b');
-      grad.addColorStop(1, '#080d14');
-      this.ctx.fillStyle = grad;
-      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      this.ctx.fillStyle = '#0d131a';
+      this.ctx.fillRect(0, 0, w, h);
     }
   }
 
-  // 별도 서리 전용 오프스크린 연산 (배경을 훼손하지 않음)
-  // 1. 오프스크린 서리 레이어 연산 (시간 지나도 지워지지 않고 자국 유지)
-  renderFrostOffscreen(now) {
-    const fCtx = this.frostCtx;
-    const w = this.frostCanvas.width;
-    const h = this.frostCanvas.height;
-
-    fCtx.clearRect(0, 0, w, h);
-
-    // 뽀얀 유리창 서리 필름
-    fCtx.save();
-    fCtx.fillStyle = 'rgba(175, 198, 215, 0.78)';
-    fCtx.fillRect(0, 0, w, h);
-
-    // 오프스크린 서리 레이어에 destination-out 처리
-    fCtx.globalCompositeOperation = 'destination-out';
-
-    let len = this.clearedPills.length;
-    for (let i = len - 1; i >= 0; i--) {
-      const pill = this.clearedPills[i];
-
-      // 고정 투명도 적용 (자동 타이머 연산 제거)
-      // 0.85로 설정하여 닦아낸 곳에 15% 정도의 옅은 서리 잔여 자국 유지
-      const maxEraseAlpha = 0.85;
-
-      const grad = fCtx.createRadialGradient(
-        pill.x, pill.y, 0,
-        pill.x, pill.y, pill.radius
-      );
-      grad.addColorStop(0, `rgba(0, 0, 0, ${maxEraseAlpha})`);
-      grad.addColorStop(0.6, `rgba(0, 0, 0, ${maxEraseAlpha * 0.75})`);
-      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-      fCtx.beginPath();
-      fCtx.arc(pill.x, pill.y, pill.radius, 0, Math.PI * 2);
-      fCtx.fillStyle = grad;
-      fCtx.fill();
-    }
-    fCtx.restore();
-  }
-
-  // 2. Erase 연산에서 시간 기록 단순화
+  // 💡 [최적화 핵심] 매 프레임 재연산 대신, 손으로 문지를 때만 서리 오프스크린에 바로 구멍 뚫기
   erase(x, y, isMove = false) {
-    const radius = this.brushRadius;
+  const radius = this.brushRadius;
+  const now = Date.now();
 
-    const triggerFadeInRadius = (cx, cy) => {
-      const minX = cx - radius;
-      const maxX = cx + radius;
-      const minY = cy - radius;
-      const maxY = cy + radius;
+  const addPill = (cx, cy) => {
+    // 뚫린 자국 정보 저장 (생성 시간 now)
+    this.fadePills.push({
+      x: cx,
+      y: cy,
+      radius: radius,
+      time: now
+    });
 
-      const len = this.staticDrops.length;
-      for (let i = 0; i < len; i++) {
-        const drop = this.staticDrops[i];
-        if (drop.isFading) continue;
-
-        if (drop.x >= minX && drop.x <= maxX && drop.y >= minY && drop.y <= maxY) {
-          const dx = drop.x - cx;
-          const dy = drop.y - cy;
-          if (dx * dx + dy * dy <= radius * radius) {
-            drop.isFading = true;
-          }
-        }
+    // 주변 static 물방울 투명화 처리
+    const len = this.staticDrops.length;
+    for (let i = 0; i < len; i++) {
+      const drop = this.staticDrops[i];
+      if (!drop.isFading && Math.hypot(drop.x - cx, drop.y - cy) <= radius) {
+        drop.isFading = true;
       }
-    };
+    }
+  };
 
-    const addPill = (px, py) => {
-  // 그려진 시점의 타임스탬프(now) 저장
-  this.clearedPills.push({ x: px, y: py, radius, time: now });
-
-  // 💡 배열이 600개를 넘어가면 가장 오래된 자국을 지워 연산량 유지
-  if (this.clearedPills.length > 600) {
-    this.clearedPills.shift();
+  if (isMove) {
+    const dist = Math.hypot(x - this.lastX, y - this.lastY);
+    const steps = Math.ceil(dist / 4);
+    for (let i = 0; i < steps; i++) {
+      const currX = this.lastX + (x - this.lastX) * (i / steps);
+      const currY = this.lastY + (y - this.lastY) * (i / steps);
+      addPill(currX, currY);
+    }
+  } else {
+    addPill(x, y);
   }
 
-  triggerFadeInRadius(px, py);
-};
+  this.lastX = x;
+  this.lastY = y;
+}
 
-    if (isMove) {
-      const dist = Math.hypot(x - this.lastX, y - this.lastY);
-      const steps = Math.ceil(dist / 3);
-      for (let i = 0; i < steps; i++) {
-        const currX = this.lastX + (x - this.lastX) * (i / steps);
-        const currY = this.lastY + (y - this.lastY) * (i / steps);
-        addPill(currX, currY);
+updateRefrost() {
+  const fCtx = this.frostCtx;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  // 1. 오프스크린 캔버스를 기본 서리 바탕으로 초기화
+  fCtx.save();
+  fCtx.globalCompositeOperation = 'source-over';
+  fCtx.clearRect(0, 0, w, h);
+  fCtx.fillStyle = 'rgba(175, 198, 215, 0.78)';
+  fCtx.fillRect(0, 0, w, h);
+
+  if (this.fadePills.length === 0) {
+    fCtx.restore();
+    return;
+  }
+
+  const now = Date.now();
+  const holdTime = 5000;     // 5초 유지
+  const fadeDuration = 8000; // 8초 동안 자연스럽게 구멍이 좁혀지며 사라짐
+
+  // 2. destination-out 모드로 유효한 자국들만 뚫어주기
+  fCtx.globalCompositeOperation = 'destination-out';
+
+  for (let i = this.fadePills.length - 1; i >= 0; i--) {
+    const pill = this.fadePills[i];
+    const elapsed = now - pill.time;
+
+    let alpha = 1.0;
+    let currentRadius = pill.radius;
+
+    if (elapsed > holdTime) {
+      const progress = (elapsed - holdTime) / fadeDuration;
+
+      if (progress >= 1) {
+        // 수명이 다한 자국은 제거
+        this.fadePills.splice(i, 1);
+        continue;
       }
-    } else {
-      addPill(x, y);
+
+      // 시간이 지날수록 알파값과 반지름을 줄여 자연스럽게 서리가 차오르는 효과
+      alpha = 1.0 - progress;
+      currentRadius = pill.radius * (1.0 - progress * 0.3);
     }
 
-    this.lastX = x;
-    this.lastY = y;
+    const grad = fCtx.createRadialGradient(
+      pill.x, pill.y, 0,
+      pill.x, pill.y, currentRadius
+    );
+    grad.addColorStop(0, `rgba(0, 0, 0, ${0.95 * alpha})`);
+    grad.addColorStop(0.7, `rgba(0, 0, 0, ${0.8 * alpha})`);
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+    fCtx.fillStyle = grad;
+    fCtx.beginPath();
+    fCtx.arc(pill.x, pill.y, currentRadius, 0, Math.PI * 2);
+    fCtx.fill();
   }
 
-  // 2. Breath(입김) 도구 연산 (닦아낸 자국을 지우고 다시 서리를 차오르게 함)
+  fCtx.restore();
+}
+
+  // 입김 도구: 닦아낸 영역에 다시 뽀얀 서리 복원하기
   steamRefrost(x, y) {
-    const steamRadius = 50;
-    const len = this.clearedPills.length;
+    const radius = 45;
+    const fCtx = this.frostCtx;
 
-    for (let i = len - 1; i >= 0; i--) {
-      const pill = this.clearedPills[i];
-      const dx = pill.x - x;
-      const dy = pill.y - y;
+    fCtx.save();
+    fCtx.globalCompositeOperation = 'source-over';
 
-      // 입김 범위 내에 있는 닦은 자국 기록을 제거하여 서리 복원
-      if (dx * dx + dy * dy <= steamRadius * steamRadius) {
-        this.clearedPills[i] = this.clearedPills[this.clearedPills.length - 1];
-        this.clearedPills.pop();
-      }
-    }
+    const grad = fCtx.createRadialGradient(x, y, 0, x, y, radius);
+    grad.addColorStop(0, 'rgba(175, 198, 215, 0.25)');
+    grad.addColorStop(0.8, 'rgba(175, 198, 215, 0.1)');
+    grad.addColorStop(1, 'rgba(175, 198, 215, 0)');
+
+    fCtx.fillStyle = grad;
+    fCtx.beginPath();
+    fCtx.arc(x, y, radius, 0, Math.PI * 2);
+    fCtx.fill();
+    fCtx.restore();
   }
 
   updateAndDrawStaticDrops() {
@@ -271,7 +288,7 @@ class RainWindow {
       const drop = this.staticDrops[i];
 
       if (drop.isFading) {
-        drop.alpha -= 0.02;
+        drop.alpha -= 0.03;
         if (drop.alpha <= 0) {
           this.staticDrops[i] = this.staticDrops[this.staticDrops.length - 1];
           this.staticDrops.pop();
@@ -287,7 +304,7 @@ class RainWindow {
 
       this.ctx.beginPath();
       this.ctx.arc(drop.x - drop.r * 0.25, drop.y - drop.r * 0.25, drop.r * 0.3, 0, Math.PI * 2);
-      this.ctx.fillStyle = `rgba(255, 255, 255, ${a * 1.2})`;
+      this.ctx.fillStyle = `rgba(255, 255, 255, ${a * 1.1})`;
       this.ctx.fill();
     }
   }
@@ -304,51 +321,43 @@ class RainWindow {
           drop.waitTimer = 0;
         }
       } else {
-        if (Math.random() < 0.015) {
-          drop.isWaiting = true;
-        } else {
-          drop.x += (Math.random() - 0.5) * 0.5;
-          drop.y += drop.speed;
+        drop.x += (Math.random() - 0.5) * 0.4;
+        drop.y += drop.speed;
 
+        if (Math.random() < 0.3) {
           drop.trail.push({
-            x: drop.x + (Math.random() - 0.5) * 1.2,
+            x: drop.x,
             y: drop.y - drop.r * 0.5,
-            r: Math.random() * (drop.r * 0.4) + drop.r * 0.2,
-            alpha: 0.45
+            r: drop.r * 0.3,
+            alpha: 0.35
           });
         }
       }
 
-      const tLen = drop.trail.length;
-      for (let i = tLen - 1; i >= 0; i--) {
+      // 궤적 연산
+      for (let i = drop.trail.length - 1; i >= 0; i--) {
         const t = drop.trail[i];
-        t.alpha -= 0.0018;
+        t.alpha -= 0.005;
 
         if (t.alpha <= 0) {
-          drop.trail[i] = drop.trail[drop.trail.length - 1];
-          drop.trail.pop();
+          drop.trail.splice(i, 1);
           continue;
         }
 
         this.ctx.beginPath();
         this.ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
-        this.ctx.fillStyle = `rgba(220, 235, 245, ${t.alpha * 0.4})`;
+        this.ctx.fillStyle = `rgba(220, 235, 245, ${t.alpha})`;
         this.ctx.fill();
       }
 
+      // 메인 물방울
       this.ctx.beginPath();
       this.ctx.ellipse(drop.x, drop.y, drop.r * 0.8, drop.r * 1.2, 0, 0, Math.PI * 2);
-      this.ctx.fillStyle = 'rgba(210, 230, 245, 0.3)';
+      this.ctx.fillStyle = 'rgba(210, 230, 245, 0.35)';
       this.ctx.fill();
 
-      this.ctx.beginPath();
-      this.ctx.arc(drop.x - drop.r * 0.25, drop.y - drop.r * 0.3, drop.r * 0.35, 0, Math.PI * 2);
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-      this.ctx.fill();
-
-      if (drop.y > this.canvas.height + 20) {
-        const remainingTrail = drop.trail;
-        Object.assign(drop, this.createMovingDrop(), { y: -10, trail: remainingTrail });
+      if (drop.y > window.innerHeight + 20) {
+        Object.assign(drop, this.createMovingDrop(), { y: -10, trail: [] });
       }
     }
   }
@@ -361,141 +370,18 @@ class RainWindow {
     }
   }
 
-  // 1. 손가락 닦아내기: 생성된 시간(time)을 함께 저장
-  erase(x, y, isMove = false) {
-    const radius = this.brushRadius;
-    const now = performance.now();
+  startDrawing(e) {
+    const dropdownMenu = document.getElementById('dropdown-menu');
+    const isMenuOpen = dropdownMenu && !dropdownMenu.classList.contains('hidden');
 
-    const triggerFadeInRadius = (cx, cy) => {
-      const minX = cx - radius;
-      const maxX = cx + radius;
-      const minY = cy - radius;
-      const maxY = cy + radius;
+    if (isMenuOpen || e.target.closest('.hamburger-btn')) return;
 
-      const len = this.staticDrops.length;
-      for (let i = 0; i < len; i++) {
-        const drop = this.staticDrops[i];
-        if (drop.isFading) continue;
-
-        if (drop.x >= minX && drop.x <= maxX && drop.y >= minY && drop.y <= maxY) {
-          const dx = drop.x - cx;
-          const dy = drop.y - cy;
-          if (dx * dx + dy * dy <= radius * radius) {
-            drop.isFading = true;
-          }
-        }
-      }
-    };
-
-    const addPill = (px, py) => {
-      // 그려진 시점의 타임스탬프(now) 저장
-      this.clearedPills.push({ x: px, y: py, radius, time: now });
-      triggerFadeInRadius(px, py);
-    };
-
-    if (isMove) {
-      const dist = Math.hypot(x - this.lastX, y - this.lastY);
-      const steps = Math.ceil(dist / 3);
-      for (let i = 0; i < steps; i++) {
-        const currX = this.lastX + (x - this.lastX) * (i / steps);
-        const currY = this.lastY + (y - this.lastY) * (i / steps);
-        addPill(currX, currY);
-      }
-    } else {
-      addPill(x, y);
-    }
-
+    this.isDrawing = true;
+    const { x, y } = this.getCoordinates(e);
     this.lastX = x;
     this.lastY = y;
+    this.handleAction(x, y);
   }
-
-  // 2. 오프스크린 서리 렌더링: 시간 경과에 따라 서리가 스멀스멀 복원되는 연산
-  renderFrostOffscreen(now) {
-    const fCtx = this.frostCtx;
-    const w = this.frostCanvas.width;
-    const h = this.frostCanvas.height;
-
-    fCtx.clearRect(0, 0, w, h);
-
-    // 뽀얀 유리창 서리 필름
-    fCtx.save();
-    fCtx.fillStyle = 'rgba(175, 198, 215, 0.78)';
-    fCtx.fillRect(0, 0, w, h);
-
-    // 오프스크린 서리 레이어에 destination-out 처리
-    fCtx.globalCompositeOperation = 'destination-out';
-
-    // 타이머 설정 (밀리초 단위)
-    const holdTimeMs = 6000;    // 닦고 나서 선명함이 유지되는 시간 (6초)
-    const fadeDurationMs = 14000; // 서리가 완전히 차오르기까지 걸리는 시간 (14초)
-
-    let len = this.clearedPills.length;
-    for (let i = len - 1; i >= 0; i--) {
-      const pill = this.clearedPills[i];
-      const elapsed = now - pill.time;
-
-      let maxEraseAlpha = 0.85; // 기본 닦임 강도 (15% 잔여 자국)
-
-      // 6초가 지난 시점부터 천천히 서리가 차오름
-      if (elapsed > holdTimeMs) {
-        const fadeProgress = (elapsed - holdTimeMs) / fadeDurationMs;
-        maxEraseAlpha = 0.85 * (1 - Math.min(1, fadeProgress));
-      }
-
-      // 서리가 완전히 다 차오르면 배열에서 제거하여 성능 최적화
-      if (maxEraseAlpha <= 0) {
-        this.clearedPills[i] = this.clearedPills[this.clearedPills.length - 1];
-        this.clearedPills.pop();
-        continue;
-      }
-
-      const grad = fCtx.createRadialGradient(
-        pill.x, pill.y, 0,
-        pill.x, pill.y, pill.radius
-      );
-      grad.addColorStop(0, `rgba(0, 0, 0, ${maxEraseAlpha})`);
-      grad.addColorStop(0.6, `rgba(0, 0, 0, ${maxEraseAlpha * 0.75})`);
-      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-      fCtx.beginPath();
-      fCtx.arc(pill.x, pill.y, pill.radius, 0, Math.PI * 2);
-      fCtx.fillStyle = grad;
-      fCtx.fill();
-    }
-    fCtx.restore();
-  }
-
-  // Breath(입김): 스치면 즉시 서리가 다시 차오르는 원래 로직으로 복원
-  steamRefrost(x, y) {
-    const steamRadius = 50; 
-    const len = this.clearedPills.length;
-
-    for (let i = len - 1; i >= 0; i--) {
-      const pill = this.clearedPills[i];
-      const dx = pill.x - x;
-      const dy = pill.y - y;
-
-      // 지정한 범위(50px) 내의 닦인 자국을 한 번에 제거하여 서리 복원
-      if (dx * dx + dy * dy <= steamRadius * steamRadius) {
-        this.clearedPills[i] = this.clearedPills[this.clearedPills.length - 1];
-        this.clearedPills.pop();
-      }
-    }
-  }
-
-  startDrawing(e) {
-  const dropdownMenu = document.getElementById('dropdown-menu');
-  const isMenuOpen = dropdownMenu && !dropdownMenu.classList.contains('hidden');
-
-  // 메뉴가 열려있거나 햄버거 버튼 자체를 눌렀을 때는 드로잉 차단
-  if (isMenuOpen || e.target.closest('.hamburger-btn')) return;
-
-  this.isDrawing = true;
-  const { x, y } = this.getCoordinates(e);
-  this.lastX = x;
-  this.lastY = y;
-  this.handleAction(x, y);
-}
 
   draw(e) {
     if (!this.isDrawing) return;
@@ -566,84 +452,63 @@ class RainWindow {
         this.brushRadius = parseInt(e.target.value, 10);
       });
     }
-    
-    // bindUIEvents() 내부 하단에 추가
+
     const exportBtn = document.getElementById('btn-export');
-const flashOverlay = document.getElementById('flash-overlay');
+    const flashOverlay = document.getElementById('flash-overlay');
 
-if (exportBtn) {
-  exportBtn.addEventListener('click', () => {
-    // 1. 밝은 플래시 연출 시작
-    if (flashOverlay) {
-      flashOverlay.classList.add('flash');
-      
-      // 더 여유 있게 정점을 유지한 후 천천히 꺼짐
-      setTimeout(() => {
-        flashOverlay.classList.remove('flash');
-      }, 180);
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => {
+        if (flashOverlay) {
+          flashOverlay.classList.add('flash');
+          setTimeout(() => flashOverlay.classList.remove('flash'), 180);
+        }
+
+        setTimeout(() => {
+          const imageURI = this.canvas.toDataURL('image/png');
+          const link = document.createElement('a');
+          link.download = `DripnDraw-${Date.now()}.png`;
+          link.href = imageURI;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }, 120);
+      });
     }
 
-    // 2. 가장 밝아진 타이밍에 이미지 저장
-    setTimeout(() => {
-      const imageURI = this.canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = `DripnDraw-${Date.now()}.png`;
-      link.href = imageURI;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }, 120);
-  });
-}
-const dropBox = document.getElementById('bg-drop-zone');
-const fileInput = document.getElementById('bg-file-input');
-const dropText = document.getElementById('drop-text');
+    const dropBox = document.getElementById('bg-drop-zone');
+    const fileInput = document.getElementById('bg-file-input');
+    const dropText = document.getElementById('drop-text');
 
-if (dropBox && fileInput) {
-  // 1. 박스 클릭 시 파일 탐색기 창 열기
-  dropBox.addEventListener('click', () => {
-    fileInput.click();
-  });
+    if (dropBox && fileInput) {
+      dropBox.addEventListener('click', () => fileInput.click());
 
-  // 2. 파일 탐색기에서 파일을 직접 선택했을 때
-  fileInput.addEventListener('change', (e) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      this.handleImageFile(files[0], dropText);
+      fileInput.addEventListener('change', (e) => {
+        const files = e.target.files;
+        if (files && files.length > 0) this.handleImageFile(files[0], dropText);
+      });
+
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropBox.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }, false);
+      });
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropBox.addEventListener(eventName, () => dropBox.classList.add('drag-over'), false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropBox.addEventListener(eventName, () => dropBox.classList.remove('drag-over'), false);
+      });
+
+      dropBox.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) this.handleImageFile(files[0], dropText);
+      });
     }
-  });
-
-  // 3. 브라우저 기본 파일 열기 기본 동작 방지
-  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    dropBox.addEventListener(eventName, (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    }, false);
-  });
-
-  // 4. 드래그 진입/체류 시 시각 효과
-  ['dragenter', 'dragover'].forEach(eventName => {
-    dropBox.addEventListener(eventName, () => {
-      dropBox.classList.add('drag-over');
-    }, false);
-  });
-
-  ['dragleave', 'drop'].forEach(eventName => {
-    dropBox.addEventListener(eventName, () => {
-      dropBox.classList.remove('drag-over');
-    }, false);
-  });
-
-  // 5. 드래그 앤 드롭으로 파일을 떨어뜨렸을 때
-  dropBox.addEventListener('drop', (e) => {
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      this.handleImageFile(files[0], dropText);
-    }
-  });
-}
   }
-  // 1. 이미지 파일 처리 최적화 (유효성 검사 및 로드 통합)
+
   handleImageFile(file, textElement) {
     if (!file || !file.type.startsWith('image/')) {
       alert('이미지 파일만 배경으로 지정할 수 있습니다.');
@@ -662,8 +527,6 @@ if (dropBox && fileInput) {
         const name = file.name;
         textElement.textContent = `✅ ${name.length > 15 ? name.slice(0, 12) + '...' : name}`;
       }
-
-      this.drawBackground?.();
       URL.revokeObjectURL(imageUrl);
     };
 
@@ -674,41 +537,7 @@ if (dropBox && fileInput) {
 
     img.src = imageUrl;
   }
-
-  // 2. 화면 비율 맞춤 렌더링 최적화 (연산 간소화)
-  drawBackground() {
-    this.ctx.clearRect(0, 0, this.width, this.height);
-
-    if (!this.bgLoaded || !this.bgImage) {
-      this.ctx.fillStyle = '#0d131a';
-      this.ctx.fillRect(0, 0, this.width, this.height);
-      return;
-    }
-
-    const imgRatio = this.bgImage.width / this.bgImage.height;
-    const canvasRatio = this.width / this.height;
-    let w = this.width, h = this.height, x = 0, y = 0;
-
-    // ⭐ Cover (잘라서 꽉 채우기) 대신 Contain (전체가 다 보이게 맞추기) 적용
-    if (imgRatio > canvasRatio) {
-      // 이미지가 더 가로로 긴 경우 -> 가로에 맞추고 세로 여백은 위아래로 분배
-      h = w / imgRatio;
-      y = (this.height - h) / 2;
-    } else {
-      // 이미지가 더 세로로 긴 경우 -> 세로에 맞추고 가로 여백은 양옆으로 분배
-      w = h * imgRatio;
-      x = (this.width - w) / 2;
-    }
-
-    // 1단계: 빈 공간(여백)을 채울 깔끔한 배경색 지정 (예: 어두운 감성 배경색)
-    this.ctx.fillStyle = '#0d131a';
-    this.ctx.fillRect(0, 0, this.width, this.height);
-
-    // 2단계: 그림이 잘리지 않도록 전체 비율에 맞춰 그리기
-    this.ctx.drawImage(this.bgImage, x, y, w, h);
-  }
 }
-
 
 document.addEventListener('DOMContentLoaded', () => {
   new RainWindow('frost-canvas');
