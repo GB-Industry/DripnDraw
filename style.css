@@ -1,0 +1,357 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #0d131a;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#frost-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  display: block;
+}
+
+.menu-container {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* 햄버거 버튼 (글래스모피즘) */
+.hamburger-btn {
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.3s, transform 0.2s;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+}
+
+.hamburger-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.hamburger-btn:active {
+  transform: scale(0.95);
+}
+
+.hamburger-btn span {
+  width: 20px;
+  height: 2px;
+  background-color: #ffffff;
+  border-radius: 2px;
+  transition: transform 0.3s, opacity 0.3s;
+}
+
+.hamburger-btn.open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.hamburger-btn.open span:nth-child(2) {
+  opacity: 0;
+}
+.hamburger-btn.open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* 드롭다운 메뉴 */
+.dropdown-menu {
+  margin-top: 10px;
+  width: 210px;
+  padding: 14px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  color: #fff;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+
+  transform-origin: top left;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dropdown-menu.hidden {
+  opacity: 0;
+  transform: translateY(-12px) scale(0.95);
+  pointer-events: none;
+}
+
+/* 도구 선택버튼 영역 */
+.tool-select {
+  display: flex;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+
+.tool-select button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.tool-select button.active {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 옵션 영역 */
+.tool-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tool-options.hidden {
+  display: none !important;
+}
+
+.tool-options label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.tool-options input[type="range"] {
+  width: 100%;
+  accent-color: #8bbce8;
+  cursor: pointer;
+}
+
+.tool-desc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.4;
+}
+
+.action-group {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 12px;
+}
+
+.action-btn {
+  width: 100%;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.action-btn:active {
+  transform: scale(0.98);
+}
+
+/* 카메라 셔터 스무스 플래시 레이어 */
+#flash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #ffffff;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#flash-overlay.flash {
+  opacity: 0.9;
+  transition: opacity 0.12s ease-out;
+}
+
+
+/* 메뉴 내 드롭 박스 영역 */
+.drop-zone-group {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 12px;
+}
+
+.drop-box {
+  width: 100%;
+  height: 65px;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.drop-box span {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  pointer-events: none;
+  padding: 0 8px;
+}
+
+/* 파일이 박스 위로 올라왔을 때 하이라이트 */
+.drop-box.drag-over {
+  border-color: #8bbce8;
+  background: rgba(139, 188, 232, 0.15);
+}
+
+.drop-box.drag-over span {
+  color: #ffffff;
+}
+/* 메뉴 푸터 영역 (의견 남기기 & 후원 버튼 묶음) */
+.menu-footer {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 푸터 영역 전체 간격 줄이기 */
+.menu-footer {
+  margin-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px; /* 버튼 사이 간격 축소 */
+}
+
+/* 버튼 사이즈를 더 작고 아담하게 조절 */
+.menu-link-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  padding: 7px 10px; /* 상하좌우 여백을 줄여서 슬림하게 변경 */
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px; /* 모서리 곡률도 살짝 컴팩트하게 조정 */
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px; /* 글씨 크기를 11px로 줄여 아기자기한 느낌 연출 */
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.menu-link-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+
+.menu-link-btn:active {
+  transform: scale(0.98);
+}
+
+/* 후원 버튼 특화 스타일 (사이즈 축소 호환) */
+.donate-btn {
+  background: linear-gradient(135deg, rgba(255, 170, 51, 0.15), rgba(255, 100, 100, 0.15));
+  border: 1px solid rgba(255, 170, 51, 0.35);
+  color: #ffca7a;
+}
+
+.donate-btn:hover {
+  background: linear-gradient(135deg, rgba(255, 170, 51, 0.25), rgba(255, 100, 100, 0.25));
+  border-color: rgba(255, 170, 51, 0.6);
+  color: #ffdb99;
+}
+.logo-watermark {
+    position: fixed; /* 화면에 고정 */
+    right: 24px;     /* 우측에서 24px 떨어짐 */
+    bottom: 24px;    /* 하단에서 24px 떨어짐 */
+    z-index: 5;      /* 메뉴(10)보다는 낮고 캔버스(1)보다는 높게 설정 */
+    pointer-events: none; /* 로고 클릭이 방해되지 않도록 설정 */
+    opacity: 0.4;    /* 배경과 어우러지도록 투명도 40% 적용 (감성 포인트) */
+    transition: opacity 0.3s ease; /* 호버 시 투명도가 변하는 애니메이션 효과 */
+}
+
+/* 로고 이미지 크기 조절 */
+.logo-watermark {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 5;
+    pointer-events: none; /* 클릭 방해 방지 */
+    opacity: 0.35;        /* 은은하게 스며드는 투명도 */
+    transition: opacity 0.3s ease;
+}
+
+/* 로고 크기 대폭 축소 (데스크톱 기준 최대 60~70px) */
+.logo-watermark img {
+    max-width: 65px; 
+    height: auto;
+    display: block;
+}
+
+/* 마우스 올렸을 때 살짝 선명해짐 */
+.logo-watermark:hover {
+    opacity: 0.7;
+}
+
+/* 📱 모바일 화면 대응 (더 아담하게) */
+@media (max-width: 768px) {
+    .logo-watermark {
+        right: 14px;
+        bottom: 14px;
+    }
+    .logo-watermark img {
+        max-width: 45px; /* 모바일에서는 낙서를 가리지 않도록 아주 작게 */
+    }
+}

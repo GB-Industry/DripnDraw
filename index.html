@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drip&Draw</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 셔터 스무스 플래시 오버레이 -->
+  <div id="flash-overlay"></div>
+
+  <!-- 캔버스 단일 레이어로 자연스러운 복합 블렌딩 처리 -->
+  <canvas id="frost-canvas"></canvas>
+
+  <!-- 1. 좌측 상단 UI (메뉴 영역) -->
+  <div class="menu-container">
+    <button id="menu-toggle" class="hamburger-btn" aria-label="메뉴 열기">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+    
+    <nav id="dropdown-menu" class="dropdown-menu hidden">
+      <!-- 1. 도구 버튼 (Finger / Breath) -->
+      <div class="tool-select">
+        <button id="tool-finger" class="active">👆 Finger</button>
+        <button id="tool-breath">💨 Breath</button>
+      </div>
+
+      <!-- 2. Finger 전용 옵션 -->
+      <div id="finger-options" class="tool-options">
+        <label for="brush-size">Finger Size</label>
+        <input type="range" id="brush-size" min="10" max="80" value="28">
+      </div>
+
+      <!-- 3. Breath 전용 옵션 -->
+      <div id="breath-options" class="tool-options hidden">
+        <p class="tool-desc">Drag to blow air into it and make it blurry again!</p>
+      </div>
+
+      <!-- 4. 단일 이미지 저장 버튼 -->
+      <div class="tool-options action-group">
+        <button id="btn-export" class="action-btn">📷 ScreenCap</button>
+      </div>
+
+      <!-- 5.배경 선택하기 드래그앤드롭 및 첨부옵션 -->
+      <div class="tool-options drop-zone-group">
+        <label>BACKGROUND IMAGE</label>
+        <div id="bg-drop-zone" class="drop-box">
+          <span id="drop-text">🖼️ Drag or click to upload your image</span>
+          <!-- 숨겨진 파일 선택 인풋 -->
+          <input type="file" id="bg-file-input" accept="image/*" style="display: none;">
+        </div>
+      </div>
+
+      <!-- 의견 남기기 버튼 -->
+      <div class="menu-footer">
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLScTn-CbdvbfRCuPuw9BhVXZ3erv-Xi93vXJ2RiOjBdAcO2tbA/viewform?usp=publish-editor" target="_blank" class="menu-link-btn">
+          💬 Feedback
+        </a>
+        <a href="https://www.buymeacoffee.com/kbin0923" target="_blank" rel="noopener noreferrer" class="menu-link-btn donate-btn">
+          ☕ Leave a Cocoa on the Sill
+        </a>
+      </div>
+    </nav>
+  </div> <!-- menu-container 끝 -->
+
+  <!-- ⭐ 2. 우측 하단 로고 컨테이너 (body 바로 아래 독립 배치) -->
+  <div class="logo-watermark">
+      <img src="LOGO.png" alt="GBIndustries" />
+  </div>
+
+
+  <script src="script.js"></script>
+</body>
+</html>
