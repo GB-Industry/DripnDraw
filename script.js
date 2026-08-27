@@ -475,14 +475,21 @@ class RainWindow {
   }
 
   startDrawing(e) {
-    if (e.target.closest('.menu-container')) return;
+  const dropdownMenu = document.getElementById('dropdown-menu');
+  const isMenuOpen = dropdownMenu && !dropdownMenu.classList.contains('hidden');
 
-    this.isDrawing = true;
-    const { x, y } = this.getCoordinates(e);
-    this.lastX = x;
-    this.lastY = y;
-    this.handleAction(x, y);
-  }
+  // 1. 메뉴가 열려있을 때는 캔버스 드로잉 차단
+  if (isMenuOpen) return;
+
+  // 2. 햄버거 버튼 자체를 클릭했을 때 드로잉 차단
+  if (e.target.closest('.hamburger-btn')) return;
+
+  this.isDrawing = true;
+  const { x, y } = this.getCoordinates(e);
+  this.lastX = x;
+  this.lastY = y;
+  this.handleAction(x, y);
+}
 
   draw(e) {
     if (!this.isDrawing) return;
